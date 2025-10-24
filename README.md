@@ -1,6 +1,6 @@
 # 🏛️ Daily US Treasury Yield Curve Analysis
 
-[![Daily Treasury Analysis](https://github.com/DataVizHonduran/treasury-analysis/actions/workflows/daily-treasury.yml/badge.svg)](https://github.com/DataVizHonduran/treasury-analysis/actions/workflows/daily-treasury.yml)
+[![Daily Treasury Analysis](https://datavizhonduran.github.io/treasury_dashboard/treasury_analysis_plotly.html)
 
 Automated daily analysis of US Treasury yield curves using real-time data from the Federal Reserve Economic Data (FRED). This repository generates interactive charts and data summaries every day after market close.
 
@@ -29,11 +29,6 @@ The analysis automatically detects and reports:
 - 🟡 **FLAT**: 2Y-10Y spread 0% to 0.5%
 - 🔴 **INVERTED**: 2Y-10Y spread < 0% (recession indicator)
 
-## 📈 Current Analysis
-
-[View Latest Interactive Chart](treasury_analysis_plotly.html) | [View Latest PNG](treasury_analysis.png)
-
-*Last updated: Automatically via GitHub Actions*
 
 ## 📜 License
 
