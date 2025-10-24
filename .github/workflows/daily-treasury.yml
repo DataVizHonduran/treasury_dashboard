@@ -31,7 +31,7 @@ jobs:
         python treasury_analysis_daily.py
         
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: treasury-analysis-${{ github.run_number }}
         path: |
