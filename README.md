@@ -1,6 +1,6 @@
 # 🏛️ Daily US Treasury Yield Curve Analysis
 
-[![Daily Treasury Analysis](https://datavizhonduran.github.io/treasury_dashboard/treasury_analysis_plotly.html)
+[![Daily Treasury Analysis]([https://datavizhonduran.github.io/treasury_dashboard/treasury_analysis_plotly.html])
 
 Automated daily analysis of US Treasury yield curves using real-time data from the Federal Reserve Economic Data (FRED). This repository generates interactive charts and data summaries every day after market close.
 
