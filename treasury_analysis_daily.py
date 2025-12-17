@@ -194,11 +194,11 @@ def plot_curve(df, stats, n_days=90):
     
     # 3. Yield spread
     if '10Y' in df.columns and '2Y' in df.columns:
-        spread = (df['10Y'] - df['2Y']).tail(252)
+        spread_2y10y = (df['10Y'] - df['2Y']).tail(252)
         fig.add_trace(
             go.Scatter(
-                x=spread.index,
-                y=spread,
+                x=spread_2y10y.index,
+                y=spread_2y10y,
                 mode='lines',
                 line=dict(width=2, color='red'),
                 fill='tonexty',
@@ -208,10 +208,25 @@ def plot_curve(df, stats, n_days=90):
             ),
             row=2, col=1
         )
-        
-        # Add zero line
-        fig.add_hline(y=0, line_dash="dash", line_color="black", 
-                     opacity=0.7, row=2, col=1)
+
+    # Add 5Y-30Y spread
+    if '5Y' in df.columns and '30Y' in df.columns:
+        spread_5y30y = (df['30Y'] - df['5Y']).tail(252)
+        fig.add_trace(
+            go.Scatter(
+                x=spread_5y30y.index,
+                y=spread_5y30y,
+                mode='lines',
+                line=dict(width=2, color='green'),
+                name='5Y-30Y Spread',
+                showlegend=False
+            ),
+            row=2, col=1
+        )
+
+    # Add zero line
+    fig.add_hline(y=0, line_dash="dash", line_color="black",
+                 opacity=0.7, row=2, col=1)
     
     # 4. Statistics comparison
     comparison = stats[['Current', f'{n_days}D_Min', f'{n_days}D_Max']].dropna()
@@ -281,6 +296,19 @@ def plot_curve(df, stats, n_days=90):
         font=dict(size=10)
     )
     
+    fig.add_annotation(
+        text="<b>10Y-2Y</b> <span style='color:red'>━━</span><br>" +
+             "<b>5Y-30Y</b> <span style='color:green'>━━</span>",
+        xref="paper", yref="paper",
+        x=0.02, y=0.45,
+        xanchor="left", yanchor="top",
+        showarrow=False,
+        bgcolor="rgba(255,255,255,0.8)",
+        bordercolor="gray",
+        borderwidth=1,
+        font=dict(size=10)
+    )
+
     fig.add_annotation(
         text="<b>Current</b> <span style='color:blue'>━━</span><br>" +
              f"<b>{n_days}D Min</b> <span style='color:lightblue'>━━</span><br>" +
