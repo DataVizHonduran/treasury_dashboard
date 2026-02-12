@@ -26,6 +26,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install git+https://github.com/pydata/pandas-datareader.git
         pip install -r requirements.txt  # Or other dependencies
+        pip install yfinance
         
     - name: Run Treasury Analysis
       run: |
