@@ -1,88 +1,142 @@
+"""
+Daily US Treasury Yield Curve Analysis for GitHub Actions
+Uses FRED API via fredapi for reliable data access
+"""
+
+import os
 import pandas as pd
 import plotly.graph_objects as go
-import plotly.subplots as sp
+from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
-import io
-import requests
+from fredapi import Fred
 
-def get_fred_csv(series_id):
-    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        df = pd.read_csv(io.StringIO(response.text))
-        date_col = next((col for col in df.columns if 'DATE' in col.upper()), None)
-        if date_col:
-            df[date_col] = pd.to_datetime(df[date_col])
-            df.set_index(date_col, inplace=True)
-            df.replace('.', pd.NA, inplace=True)
-            return df.astype(float)
-    return pd.DataFrame()
+
+# ---------------------------------------------------------
+# CONFIGURATION
+# ---------------------------------------------------------
+API_KEY = os.environ.get('FRED_API_KEY')
+if not API_KEY:
+    raise ValueError("FRED_API_KEY environment variable is not set")
+
+fred = Fred(api_key=API_KEY)
 
 def get_treasury_data(years=2):
-    series = {
+    """
+    Fetches Treasury yields using the fredapi wrapper.
+    """
+    series_map = {
         '2Y': 'DGS2',
         '5Y': 'DGS5',
         '10Y': 'DGS10',
         '30Y': 'DGS30'
     }
-    
+
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365 * years)
-    
-    all_data = []
-    for name, s_id in series.items():
-        df_s = get_fred_csv(s_id)
-        if not df_s.empty:
-            df_s.columns = [name]
-            all_data.append(df_s)
-            
-    if not all_data:
+
+    data_frames = []
+
+    for name, s_id in series_map.items():
+        # fredapi returns a Series with a DatetimeIndex
+        s = fred.get_series(s_id, observation_start=start_date)
+        df_s = s.to_frame(name=name)
+        data_frames.append(df_s)
+
+    if not data_frames:
         return pd.DataFrame()
-        
-    df = pd.concat(all_data, axis=1).dropna(how='all')
-    df = df[df.index >= start_date]
+
+    # Merge all series on the date index
+    df = pd.concat(data_frames, axis=1)
+
+    # Clean data: FRED uses NaN for holidays; we forward-fill to maintain continuity
     df.ffill(inplace=True)
-    
-    return df
+    return df.dropna()
 
 def plot_curve(df, n_days=90):
+    """
+    Generates a 4-pane interactive visualization of the yield environment.
+    """
+    # Calculate stats for the range comparison
     stats = pd.DataFrame({
         'Current': df.iloc[-1],
         'Min': df.tail(n_days).min(),
         'Max': df.tail(n_days).max()
     })
-    
+
     maturities = ['2Y', '5Y', '10Y', '30Y']
-    y_vals = [stats['Current'][m] for m in maturities]
-    
-    fig = sp.make_subplots(
+    current_yields = [stats['Current'][m] for m in maturities]
+
+    fig = make_subplots(
         rows=2, cols=2,
-        subplot_titles=['Current Yield Curve', 'Historical Yields', '2s10s & 5s30s Spreads', f'Current vs {n_days}D Range']
+        vertical_spacing=0.15,
+        horizontal_spacing=0.1,
+        subplot_titles=(
+            'Current Yield Curve',
+            'Historical Yields (1Y)',
+            'Spreads: 2s10s & 5s30s',
+            f'Current vs {n_days}D Range'
+        )
     )
-    
-    fig.add_trace(go.Scatter(x=maturities, y=y_vals, mode='lines+markers+text',
-                   text=[f'{y:.2f}%' for y in y_vals], textposition='top center',
-                   line=dict(width=3, color='blue'), name='Current'), row=1, col=1)
-    
+
+    # 1. Current Yield Curve
+    fig.add_trace(go.Scatter(
+        x=maturities, y=current_yields,
+        mode='lines+markers+text',
+        text=[f'{y:.2f}%' for y in current_yields],
+        textposition='top center',
+        line=dict(width=4, color='#1f77b4'),
+        name='Current'
+    ), row=1, col=1)
+
+    # 2. Historical Yields (Last 252 trading days)
     for m in maturities:
-        fig.add_trace(go.Scatter(x=df.tail(252).index, y=df[m].tail(252), name=m), row=1, col=2)
-    
+        fig.add_trace(go.Scatter(
+            x=df.tail(252).index,
+            y=df[m].tail(252),
+            name=m,
+            opacity=0.8
+        ), row=1, col=2)
+
+    # 3. Yield Spreads (Term Premium Proxy)
+    # Calculation: Spread = Yield_{long} - Yield_{short}
     s2s10s = (df['10Y'] - df['2Y']).tail(252)
     s5s30s = (df['30Y'] - df['5Y']).tail(252)
-    fig.add_trace(go.Scatter(x=s2s10s.index, y=s2s10s, name='2s10s', line=dict(color='red')), row=2, col=1)
-    fig.add_trace(go.Scatter(x=s5s30s.index, y=s5s30s, name='5s30s', line=dict(color='green')), row=2, col=1)
-    fig.add_hline(y=0, line_dash="dash", row=2, col=1)
-    
-    for col, color in zip(['Min', 'Current', 'Max'], ['lightblue', 'blue', 'lightcoral']):
-        fig.add_trace(go.Scatter(x=maturities, y=stats[col], mode='lines+markers', name=col, line=dict(color=color)), row=2, col=2)
-    
-    fig.update_layout(height=800, template='plotly_white', showlegend=False)
-    fig.write_html('treasury_yield_analysis.html')
-    fig.show()
+
+    fig.add_trace(go.Scatter(x=s2s10s.index, y=s2s10s, name='2s10s', line=dict(color='#d62728')), row=2, col=1)
+    fig.add_trace(go.Scatter(x=s5s30s.index, y=s5s30s, name='5s30s', line=dict(color='#2ca02c')), row=2, col=1)
+    fig.add_hline(y=0, line_dash="dash", line_color="black", row=2, col=1)
+
+    # 4. Current vs Range (Contextualizing Volatility)
+    for col, color in zip(['Min', 'Current', 'Max'], ['#aec7e8', '#1f77b4', '#ff7f0e']):
+        fig.add_trace(go.Scatter(
+            x=maturities,
+            y=stats[col],
+            mode='lines+markers',
+            name=col,
+            line=dict(color=color, dash='dot' if col != 'Current' else 'solid')
+        ), row=2, col=2)
+
+    # Layout Adjustments
+    fig.update_layout(
+        height=900,
+        template='plotly_white',
+        title_text="U.S. Treasury Yield Analysis",
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+
+    # Update Y-axes to show percentages
+    fig.update_yaxes(ticksuffix="%")
+
+    fig.write_html('treasury_analysis_plotly.html')
+    print("✅ Interactive chart saved as 'treasury_analysis_plotly.html'")
 
 if __name__ == "__main__":
-    data = get_treasury_data()
-    if not data.empty:
-        plot_curve(data)
+    try:
+        data = get_treasury_data()
+        if not data.empty:
+            plot_curve(data)
+        else:
+            print("No data retrieved. Check your API key.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
