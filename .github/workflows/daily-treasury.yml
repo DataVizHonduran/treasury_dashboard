@@ -29,9 +29,15 @@ jobs:
       env:
         FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
 
-    - name: Commit and push results
+    - name: Push HTML to boquin.github.io
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add treasury_analysis_plotly.html
-        git diff --staged --quiet || (git commit -m "Update Treasury yield analysis - $(date +'%Y-%m-%d')" && git pull --rebase && git push)
+        git clone https://x-access-token:${{ secrets.BOQUIN_DEPLOY_TOKEN }}@github.com/DataVizHonduran/boquin.github.io.git _boquin
+        mkdir -p _boquin/reports/treasury-dashboard
+        cp treasury_analysis_plotly.html _boquin/reports/treasury-dashboard/index.html
+        cd _boquin
+        git config user.email "action@github.com"
+        git config user.name "GitHub Action"
+        git add reports/treasury-dashboard/
+        git diff --staged --quiet || git commit -m "Update treasury dashboard - $(date +'%Y-%m-%d')"
+        git pull --rebase
+        git push
